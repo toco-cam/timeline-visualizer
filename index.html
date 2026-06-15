@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Biography Timeline Generator</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --panel: #ffffff;
+    --border: #d8dce2;
+    --text: #1f2733;
+    --muted: #6b7480;
+    --accent: #2f6fed;
+    --accent-soft: #e8f0fe;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ---- Sidebar ---- */
+  #sidebar {
+    width: 360px;
+    min-width: 360px;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    padding: 20px;
+    overflow-y: auto;
+  }
+  #sidebar h1 { font-size: 18px; margin: 0 0 4px; }
+  #sidebar .sub { color: var(--muted); font-size: 12px; margin: 0 0 18px; }
+  .field { margin-bottom: 16px; }
+  .field > label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+  .field .hint { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+  input[type=text], textarea, select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    background: #fff;
+    color: var(--text);
+  }
+  textarea { resize: vertical; min-height: 130px; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px; line-height: 1.5; }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; }
+  button {
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--text);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+  }
+  button:hover { background: #f0f2f5; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { filter: brightness(1.05); }
+  .seg { display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .seg button { border: none; border-radius: 0; flex: 1; background: #fff; }
+  .seg button.active { background: var(--accent-soft); color: var(--accent); }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .file-row { display: flex; align-items: center; gap: 8px; }
+  .file-row input[type=file] { font-size: 12px; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  #status { font-size: 12px; color: var(--muted); margin-top: 8px; min-height: 16px; }
+  #status.error { color: #c0392b; }
+
+  /* ---- Stage ---- */
+  #stage {
+    flex: 1;
+    overflow: auto;
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+  }
+  .card-wrap {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,.05);
+    overflow: hidden;
+    width: 100%;
+    max-width: 1000px;
+  }
+  .card-wrap > .cap {
+    font-size: 12px;
+    color: var(--muted);
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .card-wrap svg { display: block; width: 100%; height: auto; }
+  .cap .dl { display: flex; gap: 6px; }
+  .cap .dl button { padding: 4px 8px; font-size: 11px; }
+
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.ghost { width: 100%; margin-top: 8px; background: #fff; }
+
+  /* ---- Fullscreen overlay ---- */
+  #overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 25, 33, .92);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  #overlay.open { display: flex; }
+  #overlay .ov-stage {
+    width: 92vw;
+    height: 86vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #overlay .ov-stage svg {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 10px 40px rgba(0,0,0,.4);
+  }
+  #overlay .ov-btn {
+    position: absolute;
+    background: rgba(255,255,255,.14);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.3);
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    font-size: 26px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #overlay .ov-btn:hover { background: rgba(255,255,255,.28); }
+  #overlay #ovClose { top: 20px; right: 24px; font-size: 24px; }
+  #overlay #ovPrev { left: 24px; top: 50%; transform: translateY(-50%); }
+  #overlay #ovNext { right: 24px; top: 50%; transform: translateY(-50%); }
+  #overlay #ovCounter {
+    position: absolute;
+    bottom: 22px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #fff;
+    font-size: 13px;
+    background: rgba(255,255,255,.14);
+    padding: 6px 14px;
+    border-radius: 20px;
+  }
+  #overlay .ov-btn.hidden, #overlay #ovCounter.hidden { display: none; }
+</style>
+</head>
+<body>
+  <aside id="sidebar">
+    <h1>Biography Timeline</h1>
+    <p class="sub">Generate standardized timeline graphics for slides — 100% offline.</p>
+
+    <div class="field">
+      <label>Title</label>
+      <input type="text" id="title" placeholder="e.g. Albert Einstein (1879–1955)" />
+      <div class="hint">Auto-filled from <code>#title:</code> in your data. Edit to override.</div>
+    </div>
+
+    <div class="field">
+      <label>Data (Year, Event, Category)</label>
+      <textarea id="data" spellcheck="false"></textarea>
+      <div class="hint">Paste from Excel, or load a file below. Comma, semicolon or tab separated — all work.</div>
+    </div>
+
+    <div class="field">
+      <div class="file-row">
+        <input type="file" id="file" accept=".csv,.tsv,.txt" />
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <button id="loadSample">Load sample</button>
+        <button id="downloadTemplate">Download template</button>
+      </div>
+    </div>
+
+    <hr />
+
+    <div class="field">
+      <label>Layout</label>
+      <div class="seg" id="layoutSeg">
+        <button data-mode="single" class="active">One picture</button>
+        <button data-mode="split">Two pictures</button>
+      </div>
+    </div>
+
+    <div class="field" id="splitField" style="display:none;">
+      <label>Split after event #</label>
+      <input type="text" id="splitAt" />
+      <div class="hint">Defaults to the midpoint. Both images use identical sizing so they match across two slides.</div>
+    </div>
+
+    <div class="field">
+      <label>Accent color</label>
+      <div class="row">
+        <input type="text" id="accentColor" value="#2f6fed" />
+        <input type="color" id="accentPick" value="#2f6fed" style="flex:0 0 44px; padding:2px; height:36px;" />
+      </div>
+    </div>
+
+    <button class="primary" id="render" style="width:100%;">Generate timeline</button>
+    <div id="status"></div>
+  </aside>
+
+  <main id="stage"></main>
+
+  <div id="overlay" aria-hidden="true">
+    <button class="ov-btn" id="ovClose" title="Close (Esc)">×</button>
+    <button class="ov-btn" id="ovPrev" title="Previous (←)">‹</button>
+    <div class="ov-stage" id="ovStage"></div>
+    <button class="ov-btn" id="ovNext" title="Next (→)">›</button>
+    <div id="ovCounter"></div>
+  </div>
+
+<script>
+"use strict";
+
+/* ===================== Sample data ===================== */
+var SAMPLE = [
+  "#title: Marie Curie (1867–1934)",
+  "Year;Event;Category",
+  "1867;Born in Warsaw, Poland;Personal",
+  "1891;Moves to Paris to study at the Sorbonne;Education",
+  "1895;Marries Pierre Curie;Personal",
+  "1898;Discovers polonium and radium;Science",
+  "1903;Nobel Prize in Physics (shared);Award",
+  "1906;Becomes first female professor at the Sorbonne;Career",
+  "1911;Nobel Prize in Chemistry;Award",
+  "1914;Leads mobile X-ray units in WWI;Career",
+  "1934;Dies in Passy, France;Personal"
+].join("\n");
+
+var TEMPLATE = [
+  "#title: Person Name (birth–death)",
+  "Year;Event;Category",
+  "1990;First lifetime event;Personal",
+  "2008;Another milestone;Education",
+  "2015;A career highlight;Career",
+  "2022;A recent event;Personal"
+].join("\n");
+
+/* Category -> color palette (accent is applied as default/fallback) */
+var PALETTE = {
+  personal:  "#e8743b",
+  education: "#19a979",
+  career:    "#2f6fed",
+  science:   "#945ecf",
+  award:     "#e0b400",
+  family:    "#d64550",
+  other:     "#6b7480"
+};
+
+/* ===================== Parsing ===================== */
+function detectDelimiter(line) {
+  var counts = { ";": (line.match(/;/g) || []).length,
+                 "\t": (line.match(/\t/g) || []).length,
+                 ",": (line.match(/,/g) || []).length };
+  var best = ",", bestN = -1;
+  for (var d in counts) { if (counts[d] > bestN) { bestN = counts[d]; best = d; } }
+  return best;
+}
+
+// Minimal CSV field splitter supporting quoted fields.
+function splitFields(line, delim) {
+  var out = [], cur = "", inQ = false;
+  for (var i = 0; i < line.length; i++) {
+    var c = line[i];
+    if (inQ) {
+      if (c === '"') {
+        if (line[i + 1] === '"') { cur += '"'; i++; }
+        else inQ = false;
+      } else cur += c;
+    } else {
+      if (c === '"') inQ = true;
+      else if (c === delim) { out.push(cur); cur = ""; }
+      else cur += c;
+    }
+  }
+  out.push(cur);
+  return out.map(function (s) { return s.trim(); });
+}
+
+function parseData(raw) {
+  var text = raw.replace(/^﻿/, ""); // strip BOM
+  var lines = text.split(/\r\n|\r|\n/);
+  var meta = { title: "" };
+  var rows = [];
+  var delim = null;
+  var headerSkipped = false;
+
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+    if (!line.trim()) continue;
+
+    // config directives: "#title: ..." or "#key: value"
+    if (line.charAt(0) === "#") {
+      var m = line.slice(1).split(":");
+      var key = (m.shift() || "").trim().toLowerCase();
+      var val = m.join(":").trim();
+      if (key === "title") meta.title = val;
+      continue;
+    }
+
+    if (delim === null) delim = detectDelimiter(line);
+    var f = splitFields(line, delim);
+
+    // skip a header row (first data line that isn't a number in col 1)
+    if (!headerSkipped && !/^-?\d/.test(f[0])) { headerSkipped = true; continue; }
+    headerSkipped = true;
+
+    if (!f[0]) continue;
+    rows.push({
+      year: f[0],
+      yearNum: parseFloat(String(f[0]).replace(/[^\d.\-]/g, "")),
+      event: f[1] || "",
+      category: (f[2] || "").trim()
+    });
+  }
+
+  rows.sort(function (a, b) {
+    if (isNaN(a.yearNum) && isNaN(b.yearNum)) return 0;
+    if (isNaN(a.yearNum)) return 1;
+    if (isNaN(b.yearNum)) return -1;
+    return a.yearNum - b.yearNum;
+  });
+  return { meta: meta, rows: rows };
+}
+
+/* ===================== Text wrapping (canvas-measured) ===================== */
+var _measureCtx = document.createElement("canvas").getContext("2d");
+function wrapText(text, font, maxWidth) {
+  _measureCtx.font = font;
+  var words = String(text).split(/\s+/);
+  var lines = [], cur = "";
+  for (var i = 0; i < words.length; i++) {
+    var test = cur ? cur + " " + words[i] : words[i];
+    if (_measureCtx.measureText(test).width > maxWidth && cur) {
+      lines.push(cur);
+      cur = words[i];
+    } else {
+      cur = test;
+    }
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function colorFor(cat, accent) {
+  var key = (cat || "").toLowerCase();
+  if (PALETTE[key]) return PALETTE[key];
+  return accent;
+}
+
+/* ===================== SVG timeline builder ===================== */
+var W = 1280, H = 720; // 16:9 slide-friendly base
+
+function buildSVG(title, rows, accent) {
+  var n = rows.length;
+  var marginX = 90;
+  var axisY = H * 0.52;
+  var usable = W - marginX * 2;
+  var step = n > 1 ? usable / (n - 1) : 0;
+  var startX = n > 1 ? marginX : W / 2;
+
+  // card text width: keep cards on the same side (2 steps apart) from colliding
+  var cardW = Math.max(120, Math.min(240, (n > 1 ? step * 1.55 : 320)));
+  var pad = 12;
+  var textW = cardW - pad * 2;
+  var lineH = 18;
+  var connector = 34;
+  var yearFont = "700 15px -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+  var bodyFont = "400 14px -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+
+  var s = [];
+  s.push('<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif">');
+  s.push('<rect width="' + W + '" height="' + H + '" fill="#ffffff"/>');
+
+  // Title
+  if (title) {
+    s.push('<text x="' + (W / 2) + '" y="58" text-anchor="middle" font-size="30" font-weight="700" fill="#1f2733">' + esc(title) + '</text>');
+    s.push('<rect x="' + (W / 2 - 36) + '" y="74" width="72" height="4" rx="2" fill="' + accent + '"/>');
+  }
+
+  // Axis
+  s.push('<line x1="' + marginX + '" y1="' + axisY + '" x2="' + (W - marginX) + '" y2="' + axisY + '" stroke="#c2c8d0" stroke-width="3"/>');
+  s.push('<polygon points="' + (W - marginX) + ',' + (axisY - 7) + ' ' + (W - marginX + 16) + ',' + axisY + ' ' + (W - marginX) + ',' + (axisY + 7) + '" fill="#c2c8d0"/>');
+
+  for (var i = 0; i < n; i++) {
+    var r = rows[i];
+    var x = startX + step * i;
+    var above = (i % 2 === 0);
+    var col = colorFor(r.category, accent);
+
+    var lines = wrapText(r.event, bodyFont, textW);
+    var bodyH = lines.length * lineH;
+    var cardH = pad + 20 /*year*/ + 6 + bodyH + pad;
+
+    var cardY = above ? (axisY - connector - cardH) : (axisY + connector);
+    var cardX = x - cardW / 2;
+    // keep card within canvas horizontally
+    if (cardX < 8) cardX = 8;
+    if (cardX + cardW > W - 8) cardX = W - 8 - cardW;
+
+    // connector line + dot
+    var lineEndY = above ? cardY + cardH : cardY;
+    s.push('<line x1="' + x + '" y1="' + axisY + '" x2="' + x + '" y2="' + lineEndY + '" stroke="' + col + '" stroke-width="2"/>');
+    s.push('<circle cx="' + x + '" cy="' + axisY + '" r="7" fill="#fff" stroke="' + col + '" stroke-width="3"/>');
+
+    // card
+    s.push('<rect x="' + cardX + '" y="' + cardY + '" width="' + cardW + '" height="' + cardH + '" rx="8" fill="#ffffff" stroke="' + col + '" stroke-width="1.5"/>');
+    s.push('<rect x="' + cardX + '" y="' + cardY + '" width="' + cardW + '" height="6" rx="3" fill="' + col + '"/>');
+
+    var tx = cardX + pad;
+    var ty = cardY + pad + 15;
+    s.push('<text x="' + tx + '" y="' + ty + '" font-size="16" font-weight="700" fill="' + col + '">' + esc(r.year) + '</text>');
+    var byStart = ty + 24;
+    for (var L = 0; L < lines.length; L++) {
+      s.push('<text x="' + tx + '" y="' + (byStart + L * lineH) + '" font-size="14" fill="#33404f">' + esc(lines[L]) + '</text>');
+    }
+  }
+
+  s.push('</svg>');
+  return s.join("");
+}
+
+/* ===================== Export ===================== */
+function downloadBlob(blob, name) {
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+}
+
+function downloadSVG(svgString, name) {
+  downloadBlob(new Blob([svgString], { type: "image/svg+xml;charset=utf-8" }), name);
+}
+
+function downloadPNG(svgString, name, scale) {
+  scale = scale || 2.5;
+  var img = new Image();
+  var svg64 = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgString);
+  img.onload = function () {
+    var canvas = document.createElement("canvas");
+    canvas.width = W * scale;
+    canvas.height = H * scale;
+    var ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob(function (blob) {
+      if (blob) downloadBlob(blob, name);
+      else setStatus("PNG export failed in this browser; use SVG instead.", true);
+    }, "image/png");
+  };
+  img.onerror = function () { setStatus("Could not rasterize SVG for PNG.", true); };
+  img.src = svg64;
+}
+
+/* ===================== UI wiring ===================== */
+var $ = function (id) { return document.getElementById(id); };
+var layoutMode = "single";
+var currentSvgs = [];
+
+function setStatus(msg, isError) {
+  var el = $("status");
+  el.textContent = msg || "";
+  el.className = isError ? "error" : "";
+}
+
+function slug(s) {
+  return (s || "timeline").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50) || "timeline";
+}
+
+function makeCard(svgString, captionText, fileBase, index) {
+  var wrap = document.createElement("div");
+  wrap.className = "card-wrap";
+
+  var cap = document.createElement("div");
+  cap.className = "cap";
+  var label = document.createElement("span");
+  label.textContent = captionText;
+  var dl = document.createElement("div");
+  dl.className = "dl";
+
+  var pngBtn = document.createElement("button");
+  pngBtn.textContent = "Download PNG";
+  pngBtn.onclick = function () { downloadPNG(svgString, fileBase + ".png"); };
+  var svgBtn = document.createElement("button");
+  svgBtn.textContent = "Download SVG";
+  svgBtn.onclick = function () { downloadSVG(svgString, fileBase + ".svg"); };
+
+  var fsBtn = document.createElement("button");
+  fsBtn.textContent = "⛶ Full screen";
+  fsBtn.onclick = function () { openOverlay(index || 0); };
+
+  dl.appendChild(pngBtn); dl.appendChild(svgBtn); dl.appendChild(fsBtn);
+  cap.appendChild(label); cap.appendChild(dl);
+  wrap.appendChild(cap);
+
+  var holder = document.createElement("div");
+  holder.innerHTML = svgString;
+  wrap.appendChild(holder);
+  return wrap;
+}
+
+function render() {
+  var parsed = parseData($("data").value);
+  if (parsed.meta.title && !$("title").dataset.touched) {
+    $("title").value = parsed.meta.title;
+  }
+  var rows = parsed.rows;
+  var stage = $("stage");
+  stage.innerHTML = "";
+  currentSvgs = [];
+
+  if (!rows.length) {
+    setStatus("No events found. Add rows like  1990;Born in Berlin;Personal", true);
+    return;
+  }
+
+  var title = $("title").value.trim();
+  var accent = $("accentColor").value.trim() || "#2f6fed";
+  var base = slug(title);
+
+  if (layoutMode === "single") {
+    var svg = buildSVG(title, rows, accent);
+    currentSvgs.push(svg);
+    stage.appendChild(makeCard(svg, rows.length + " events · 1280×720 (16:9)", base, 0));
+    setStatus("Rendered " + rows.length + " events.");
+  } else {
+    var def = Math.ceil(rows.length / 2);
+    var splitAt = parseInt($("splitAt").value, 10);
+    if (isNaN(splitAt) || splitAt < 1 || splitAt >= rows.length) splitAt = def;
+    var a = rows.slice(0, splitAt);
+    var b = rows.slice(splitAt);
+    var t1 = title ? title + " — Part 1" : "Part 1";
+    var t2 = title ? title + " — Part 2" : "Part 2";
+    var svgA = buildSVG(t1, a, accent);
+    var svgB = buildSVG(t2, b, accent);
+    currentSvgs.push(svgA, svgB);
+    stage.appendChild(makeCard(svgA, "Part 1 · " + a.length + " events", base + "-part1", 0));
+    stage.appendChild(makeCard(svgB, "Part 2 · " + b.length + " events", base + "-part2", 1));
+    setStatus("Rendered two pictures, split after event " + splitAt + ".");
+  }
+}
+
+/* ===================== Fullscreen overlay ===================== */
+var overlayIndex = 0;
+
+function updateOverlay() {
+  $("ovStage").innerHTML = currentSvgs[overlayIndex] || "";
+  var multi = currentSvgs.length > 1;
+  $("ovPrev").classList.toggle("hidden", !multi);
+  $("ovNext").classList.toggle("hidden", !multi);
+  var counter = $("ovCounter");
+  counter.classList.toggle("hidden", !multi);
+  counter.textContent = (overlayIndex + 1) + " / " + currentSvgs.length;
+}
+
+function openOverlay(index) {
+  if (!currentSvgs.length) return;
+  overlayIndex = Math.max(0, Math.min(index || 0, currentSvgs.length - 1));
+  updateOverlay();
+  $("overlay").classList.add("open");
+  $("overlay").setAttribute("aria-hidden", "false");
+}
+
+function closeOverlay() {
+  $("overlay").classList.remove("open");
+  $("overlay").setAttribute("aria-hidden", "true");
+}
+
+function stepOverlay(delta) {
+  if (currentSvgs.length < 2) return;
+  overlayIndex = (overlayIndex + delta + currentSvgs.length) % currentSvgs.length;
+  updateOverlay();
+}
+
+/* events */
+$("render").onclick = render;
+$("title").addEventListener("input", function () { this.dataset.touched = "1"; });
+
+$("ovClose").onclick = closeOverlay;
+$("ovPrev").onclick = function () { stepOverlay(-1); };
+$("ovNext").onclick = function () { stepOverlay(1); };
+$("overlay").addEventListener("click", function (e) {
+  if (e.target.closest(".ov-btn")) return;   // control buttons handle themselves
+  if (e.target.closest("svg")) return;       // clicking the image keeps it open
+  closeOverlay();                            // any other (backdrop/empty) click closes
+});
+document.addEventListener("keydown", function (e) {
+  if (!$("overlay").classList.contains("open")) return;
+  if (e.key === "Escape") closeOverlay();
+  else if (e.key === "ArrowLeft") stepOverlay(-1);
+  else if (e.key === "ArrowRight") stepOverlay(1);
+});
+
+$("file").addEventListener("change", function (e) {
+  var f = e.target.files[0];
+  if (!f) return;
+  var reader = new FileReader();
+  reader.onload = function () {
+    $("data").value = reader.result;
+    $("title").dataset.touched = "";
+    render();
+  };
+  reader.readAsText(f);
+});
+
+$("loadSample").onclick = function () {
+  $("data").value = SAMPLE;
+  $("title").dataset.touched = "";
+  render();
+};
+
+$("downloadTemplate").onclick = function () {
+  downloadBlob(new Blob(["﻿" + TEMPLATE], { type: "text/csv;charset=utf-8" }), "timeline-template.csv");
+};
+
+(function () {
+  var seg = $("layoutSeg");
+  seg.addEventListener("click", function (e) {
+    var btn = e.target.closest("button");
+    if (!btn) return;
+    layoutMode = btn.dataset.mode;
+    [].forEach.call(seg.children, function (b) { b.classList.toggle("active", b === btn); });
+    $("splitField").style.display = layoutMode === "split" ? "block" : "none";
+    if ($("data").value.trim()) render();
+  });
+})();
+
+$("accentPick").addEventListener("input", function () {
+  $("accentColor").value = this.value;
+});
+$("accentColor").addEventListener("input", function () {
+  if (/^#[0-9a-fA-F]{6}$/.test(this.value)) $("accentPick").value = this.value;
+});
+
+/* boot with sample so the user sees something immediately */
+$("data").value = SAMPLE;
+render();
+</script>
+</body>
+</html>
