@@ -548,7 +548,10 @@ function render() {
   }
 
   var title = $("title").value.trim();
-  var accent = $("accentColor").value.trim() || "#2f6fed";
+  // Only accept a strict #RRGGBB / #RGB value; otherwise fall back to the
+  // default. This keeps the raw input out of SVG fill/stroke attributes.
+  var accentRaw = $("accentColor").value.trim();
+  var accent = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(accentRaw) ? accentRaw : "#2f6fed";
   var base = slug(title);
 
   if (layoutMode === "single") {
